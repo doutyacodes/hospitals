@@ -5,10 +5,10 @@ export default defineConfig({
   out: './drizzle',
   dialect: 'mysql',
   dbCredentials: {
-    host: 'localhost',
-    user: 'root',
-    password: '',
-    database: 'healthcare_db',
+    host: '68.178.163.247',
+    user: 'devuser_hospitals',
+    password: 'Wowfy#user',
+    database: 'devuser_hospitals',
     port: 3306,
   },
 });
