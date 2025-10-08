@@ -5,6 +5,21 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useToast } from '@/lib/contexts/ToastContext';
+import {
+  Activity,
+  Users,
+  Calendar,
+  TrendingUp,
+  Clock,
+  Building2,
+  FileText,
+  AlertCircle,
+  Play,
+  ChevronRight,
+  Stethoscope,
+  DollarSign,
+  UserCheck
+} from 'lucide-react';
 
 export default function DoctorDashboardPage() {
   const [stats, setStats] = useState({
@@ -15,12 +30,12 @@ export default function DoctorDashboardPage() {
     monthlyEarnings: 0,
     totalPatients: 0
   });
-  const [recentRequests, setRecentRequests] = useState([]);
-  const [upcomingSessions, setUpcomingSessions] = useState([]);
+  const [todayAppointments, setTodayAppointments] = useState([]);
+  const [doctorStatus, setDoctorStatus] = useState('offline');
   const [loadingStats, setLoadingStats] = useState(true);
   const router = useRouter();
   const { user, loading, isAuthenticated } = useAuth();
-  const { error } = useToast();
+  const { error, success } = useToast();
 
   // Redirect if not authenticated or not doctor
   useEffect(() => {
@@ -33,8 +48,8 @@ export default function DoctorDashboardPage() {
   useEffect(() => {
     if (isAuthenticated && user?.userType === 'doctor') {
       fetchDashboardStats();
-      fetchRecentRequests();
-      fetchUpcomingSessions();
+      fetchTodayAppointments();
+      fetchDoctorStatus();
     }
   }, [isAuthenticated, user]);
 
@@ -57,31 +72,29 @@ export default function DoctorDashboardPage() {
     }
   };
 
-  const fetchRecentRequests = async () => {
+  const fetchTodayAppointments = async () => {
     try {
-      const response = await fetch('/api/doctor/requests?status=pending&limit=5');
+      const response = await fetch('/api/doctor/appointments/today');
       const data = await response.json();
 
       if (data.success) {
-        setRecentRequests(data.data || []);
+        setTodayAppointments(data.appointments?.slice(0, 5) || []);
       }
     } catch (err) {
-      console.error('Recent requests error:', err);
+      console.error('Today appointments error:', err);
     }
   };
 
-  const fetchUpcomingSessions = async () => {
+  const fetchDoctorStatus = async () => {
     try {
-      const response = await fetch('/api/doctor/sessions?limit=5');
+      const response = await fetch('/api/doctor/status');
       const data = await response.json();
 
       if (data.success) {
-        // Filter active sessions only
-        const activeSessions = (data.data || []).filter(session => session.isActive);
-        setUpcomingSessions(activeSessions);
+        setDoctorStatus(data.status || 'offline');
       }
     } catch (err) {
-      console.error('Upcoming sessions error:', err);
+      console.error('Status error:', err);
     }
   };
 
@@ -97,421 +110,330 @@ export default function DoctorDashboardPage() {
     return null;
   }
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
+  const getStatusColor = (status) => {
+    const colors = {
+      online: 'bg-green-500',
+      consulting: 'bg-blue-500',
+      on_break: 'bg-yellow-500',
+      emergency: 'bg-red-500',
+      offline: 'bg-gray-500'
+    };
+    return colors[status] || colors.offline;
   };
 
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        duration: 0.5
-      }
-    }
+  const getStatusLabel = (status) => {
+    const labels = {
+      online: 'Online',
+      consulting: 'In Consultation',
+      on_break: 'On Break',
+      emergency: 'Emergency',
+      offline: 'Offline'
+    };
+    return labels[status] || 'Offline';
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-100">
-      <main className="max-w-7xl mx-auto py-6 sm:py-8 px-4 sm:px-6 lg:px-8">
-        {/* Welcome Header */}
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        {/* Header with Quick Action */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-emerald-700 to-teal-600 bg-clip-text text-transparent">
-                Welcome back, Dr. {user?.doctorName}!
-              </h1>
-              <p className="text-gray-600 mt-1">
-                Here's an overview of your medical practice
-              </p>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-700 to-teal-600 bg-clip-text text-transparent">
+                  Welcome, Dr. {user?.doctorName}
+                </h1>
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${getStatusColor(doctorStatus)} animate-pulse`}></div>
+                  <span className="text-sm font-medium text-gray-600">{getStatusLabel(doctorStatus)}</span>
+                </div>
+              </div>
+              <p className="text-gray-600">Ready to provide exceptional care today</p>
             </div>
-            <motion.div
-              className="hidden sm:flex w-12 h-12 lg:w-16 lg:h-16 bg-gradient-to-br from-emerald-600 to-teal-700 rounded-xl items-center justify-center shadow-lg"
-              whileHover={{ rotate: 360, scale: 1.05 }}
-              transition={{ duration: 0.6 }}
+
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => router.push('/doctor/consultation')}
+              className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
             >
-              <svg className="w-6 h-6 lg:w-8 lg:h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 1V3H9V1L3 7V9H21ZM12 8C14.2 8 16 9.8 16 12S14.2 16 12 16S8 14.2 8 12S9.8 8 12 8Z"/>
-              </svg>
-            </motion.div>
+              <Stethoscope className="w-5 h-5" />
+              <span>Start Consultations</span>
+              <ChevronRight className="w-5 h-5" />
+            </motion.button>
           </div>
         </motion.div>
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="space-y-8"
-        >
-          {/* Stats Cards */}
-          <motion.div 
-            variants={itemVariants}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 lg:gap-6"
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-emerald-500"
           >
-            {[
-              {
-                title: 'Associated Hospitals',
-                value: loadingStats ? '...' : stats.associatedHospitals,
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                ),
-                gradient: 'from-blue-500 to-indigo-600',
-                bgGradient: 'from-blue-50 to-indigo-50',
-                trend: stats.associatedHospitals || '0'
-              },
-              {
-                title: 'Active Sessions',
-                value: loadingStats ? '...' : stats.totalSessions,
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a1 1 0 011-1h6a1 1 0 011 1v4h3a2 2 0 012 2v1a1 1 0 01-1 1H4a1 1 0 01-1-1V9a2 2 0 012-2h3z" />
-                  </svg>
-                ),
-                gradient: 'from-emerald-500 to-teal-600',
-                bgGradient: 'from-emerald-50 to-teal-50',
-                trend: stats.totalSessions || '0'
-              },
-              {
-                title: 'Pending Requests',
-                value: loadingStats ? '...' : stats.pendingRequests,
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                ),
-                gradient: 'from-amber-500 to-orange-600',
-                bgGradient: 'from-amber-50 to-orange-50',
-                trend: stats.pendingRequests || '0'
-              },
-              {
-                title: 'Today\'s Appointments',
-                value: loadingStats ? '...' : stats.todayAppointments,
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                  </svg>
-                ),
-                gradient: 'from-green-500 to-emerald-600',
-                bgGradient: 'from-green-50 to-emerald-50',
-                trend: stats.todayAppointments || '0'
-              },
-              {
-                title: 'Monthly Earnings',
-                value: loadingStats ? '...' : `₹${stats.monthlyEarnings?.toLocaleString() || '0'}`,
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                  </svg>
-                ),
-                gradient: 'from-purple-500 to-pink-600',
-                bgGradient: 'from-purple-50 to-pink-50',
-                trend: `₹${stats.monthlyEarnings?.toLocaleString() || '0'}`
-              }
-            ].map((stat, index) => (
-              <motion.div
-                key={stat.title}
-                className={`relative bg-white rounded-xl p-6 shadow-lg border border-white/50 backdrop-blur-sm overflow-hidden`}
-                initial={{ opacity: 0, y: 50 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ 
-                  delay: index * 0.1, 
-                  duration: 0.6,
-                  type: "spring",
-                  stiffness: 100
-                }}
-                whileHover={{ 
-                  y: -8,
-                  transition: { duration: 0.3 }
-                }}
-              >
-                {/* Background Gradient */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${stat.bgGradient} opacity-60`} />
-                
-                {/* Content */}
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-4">
-                    <motion.div 
-                      className={`bg-gradient-to-r ${stat.gradient} p-3 rounded-xl shadow-lg`}
-                      whileHover={{ scale: 1.1, rotate: 5 }}
-                      transition={{ type: "spring", stiffness: 400, damping: 10 }}
-                    >
-                      <div className="text-white">
-                        {stat.icon}
-                      </div>
-                    </motion.div>
-                    <span className={`text-xs font-semibold px-2 py-1 rounded-full bg-white/80 text-emerald-600`}>
-                      {stat.trend}
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <p className={`text-2xl font-bold text-gray-800`}>
-                      {stat.value}
-                    </p>
-                    <p className="text-sm font-medium text-gray-600">
-                      {stat.title}
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm font-medium mb-1">Today's Appointments</p>
+                <h3 className="text-3xl font-bold text-gray-900">{stats.todayAppointments}</h3>
+                <p className="text-emerald-600 text-sm mt-2 flex items-center gap-1">
+                  <Clock className="w-4 h-4" />
+                  View schedule
+                </p>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-full flex items-center justify-center">
+                <Calendar className="w-7 h-7 text-emerald-600" />
+              </div>
+            </div>
           </motion.div>
 
-          {/* Quick Actions */}
-          <motion.div 
-            variants={itemVariants}
-            className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-white/50 p-6"
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm font-medium mb-1">Total Patients</p>
+                <h3 className="text-3xl font-bold text-gray-900">{stats.totalPatients}</h3>
+                <p className="text-blue-600 text-sm mt-2 flex items-center gap-1">
+                  <UserCheck className="w-4 h-4" />
+                  Lifetime
+                </p>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
+                <Users className="w-7 h-7 text-blue-600" />
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm font-medium mb-1">Monthly Earnings</p>
+                <h3 className="text-3xl font-bold text-gray-900">₹{stats.monthlyEarnings.toLocaleString()}</h3>
+                <p className="text-purple-600 text-sm mt-2 flex items-center gap-1">
+                  <TrendingUp className="w-4 h-4" />
+                  This month
+                </p>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center">
+                <DollarSign className="w-7 h-7 text-purple-600" />
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-orange-500"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm font-medium mb-1">Active Sessions</p>
+                <h3 className="text-3xl font-bold text-gray-900">{stats.totalSessions}</h3>
+                <p className="text-orange-600 text-sm mt-2 flex items-center gap-1">
+                  <Building2 className="w-4 h-4" />
+                  {stats.associatedHospitals} hospitals
+                </p>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-br from-orange-100 to-yellow-100 rounded-full flex items-center justify-center">
+                <Activity className="w-7 h-7 text-orange-600" />
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Today's Appointments List */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5 }}
+            className="lg:col-span-2 bg-white rounded-xl shadow-lg p-6"
           >
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">
-                  Quick Actions
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Calendar className="w-6 h-6 text-emerald-600" />
+                  Today's Appointments
                 </h2>
-                <p className="text-gray-600 text-sm">Manage your medical practice</p>
+                <p className="text-sm text-gray-600 mt-1">Manage your consultation schedule</p>
               </div>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => router.push('/doctor/consultation')}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2"
+              >
+                <Play className="w-4 h-4" />
+                Start
+              </motion.button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                {
-                  title: 'Hospital Requests',
-                  subtitle: 'Review collaboration requests',
-                  href: '/doctor/requests',
-                  icon: (
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
-                    </svg>
-                  ),
-                  gradient: 'from-blue-500 to-indigo-600',
-                  bgGradient: 'from-blue-50 to-indigo-50'
-                },
-                {
-                  title: 'My Sessions',
-                  subtitle: 'Manage hospital sessions',
-                  href: '/doctor/sessions',
-                  icon: (
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a1 1 0 011-1h6a1 1 0 011 1v4h3a2 2 0 012 2v1a1 1 0 01-1 1H4a1 1 0 01-1-1V9a2 2 0 012-2h3z" />
-                    </svg>
-                  ),
-                  gradient: 'from-emerald-500 to-teal-600',
-                  bgGradient: 'from-emerald-50 to-teal-50'
-                },
-                {
-                  title: 'Appointments',
-                  subtitle: 'View patient appointments',
-                  href: '/doctor/appointments',
-                  icon: (
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                    </svg>
-                  ),
-                  gradient: 'from-purple-500 to-pink-600',
-                  bgGradient: 'from-purple-50 to-pink-50'
-                },
-                {
-                  title: 'Profile',
-                  subtitle: 'Update doctor information',
-                  href: '/doctor/profile',
-                  icon: (
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  ),
-                  gradient: 'from-gray-600 to-gray-700',
-                  bgGradient: 'from-gray-50 to-gray-100'
-                }
-              ].map((action, index) => (
-                <motion.button
-                  key={action.title}
-                  onClick={() => router.push(action.href)}
-                  className={`group relative bg-gradient-to-br ${action.bgGradient} rounded-xl p-4 text-left transition-all duration-300 border border-white/50 shadow-md hover:shadow-lg overflow-hidden`}
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.8 + index * 0.1 }}
-                  whileHover={{ 
-                    scale: 1.05,
-                    y: -5,
-                    transition: { duration: 0.2 }
-                  }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <div className="relative z-10">
-                    <motion.div 
-                      className={`inline-flex p-3 rounded-xl bg-gradient-to-r ${action.gradient} text-white shadow-lg mb-3`}
-                      whileHover={{ rotate: 360 }}
-                      transition={{ duration: 0.6 }}
-                    >
-                      {action.icon}
-                    </motion.div>
-                    <h3 className="font-semibold text-gray-900 group-hover:text-gray-800 transition-colors">
-                      {action.title}
-                    </h3>
-                    <p className="text-xs text-gray-600 mt-1 group-hover:text-gray-700 transition-colors">
-                      {action.subtitle}
-                    </p>
-                  </div>
-                </motion.button>
-              ))}
-            </div>
+            {todayAppointments.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Calendar className="w-8 h-8 text-gray-400" />
+                </div>
+                <p className="text-gray-500 text-lg font-medium">No appointments today</p>
+                <p className="text-gray-400 text-sm mt-2">You're all set for the day!</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {todayAppointments.map((appointment, index) => (
+                  <motion.div
+                    key={appointment.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.6 + index * 0.05 }}
+                    className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-lg hover:shadow-md transition-all cursor-pointer"
+                    onClick={() => router.push('/doctor/consultation')}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-full flex items-center justify-center font-bold text-lg">
+                        #{appointment.tokenNumber}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900">{appointment.patientName}</p>
+                        <p className="text-sm text-gray-600">{appointment.estimatedTime}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        appointment.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                        appointment.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {appointment.status.toUpperCase()}
+                      </span>
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    </div>
+                  </motion.div>
+                ))}
+
+                {todayAppointments.length > 0 && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    onClick={() => router.push('/doctor/consultation')}
+                    className="w-full py-3 text-emerald-600 font-medium hover:bg-emerald-50 rounded-lg transition-colors"
+                  >
+                    View All Appointments →
+                  </motion.button>
+                )}
+              </div>
+            )}
           </motion.div>
 
-          {/* Recent Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Recent Requests */}
-            <motion.div 
-              variants={itemVariants}
-              className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-white/50 p-6"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    Pending Requests
-                  </h2>
-                  <p className="text-gray-600 text-sm">Hospital collaboration requests awaiting response</p>
-                </div>
-                <motion.button
-                  onClick={() => router.push('/doctor/requests')}
-                  className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  View All
-                </motion.button>
+          {/* Quick Actions */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5 }}
+            className="space-y-6"
+          >
+            {/* Consultation Card */}
+            <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg p-6 text-white">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold">Consultation Hub</h3>
+                <Stethoscope className="w-8 h-8 opacity-80" />
               </div>
-              
-              <div className="space-y-3">
-                {recentRequests.length > 0 ? (
-                  recentRequests.map((request, index) => (
-                    <motion.div 
-                      key={request.id} 
-                      className="flex items-center justify-between p-4 rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className={`w-3 h-3 rounded-full ${
-                          request.status === 'approved' ? 'bg-emerald-500' :
-                          request.status === 'declined' ? 'bg-red-500' :
-                          'bg-amber-500'
-                        }`} />
-                        <div>
-                          <p className="font-medium text-gray-900">{request.hospitalName}</p>
-                          <p className="text-sm text-gray-600">{request.hospitalCity}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                          request.status === 'approved' ? 'bg-emerald-100 text-emerald-800' :
-                          request.status === 'declined' ? 'bg-red-100 text-red-800' :
-                          'bg-amber-100 text-amber-800'
-                        }`}>
-                          {request.status}
-                        </span>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {new Date(request.requestedAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </motion.div>
-                  ))
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                      <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/>
-                      </svg>
-                    </div>
-                    <p className="text-gray-600">No pending requests</p>
-                    <p className="text-sm text-gray-500 mt-1">Hospital collaboration requests requiring response will appear here</p>
-                  </div>
-                )}
-              </div>
-            </motion.div>
+              <p className="text-emerald-100 text-sm mb-6">
+                Manage your patient consultations, update status, and provide care
+              </p>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => router.push('/doctor/consultation')}
+                className="w-full py-3 bg-white text-emerald-600 rounded-lg font-semibold hover:shadow-lg transition-all"
+              >
+                Open Consultation Page
+              </motion.button>
+            </div>
 
-            {/* Upcoming Sessions */}
-            <motion.div 
-              variants={itemVariants}
-              className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-white/50 p-6"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    Active Sessions
-                  </h2>
-                  <p className="text-gray-600 text-sm">Your current hospital consultation sessions</p>
-                </div>
+            {/* Quick Links */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Actions</h3>
+              <div className="space-y-3">
                 <motion.button
-                  onClick={() => router.push('/doctor/sessions')}
-                  className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  whileHover={{ x: 5 }}
+                  onClick={() => router.push('/doctor/appointments')}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors text-left"
                 >
-                  View All
+                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">All Appointments</p>
+                    <p className="text-xs text-gray-600">View complete history</p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ x: 5 }}
+                  onClick={() => router.push('/doctor/sessions')}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors text-left"
+                >
+                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <Activity className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">Manage Sessions</p>
+                    <p className="text-xs text-gray-600">Schedule & availability</p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ x: 5 }}
+                  onClick={() => router.push('/doctor/requests')}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors text-left"
+                >
+                  <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center relative">
+                    <Building2 className="w-5 h-5 text-orange-600" />
+                    {stats.pendingRequests > 0 && (
+                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-xs text-white font-bold">
+                        {stats.pendingRequests}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">Hospital Requests</p>
+                    <p className="text-xs text-gray-600">{stats.pendingRequests} pending</p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
                 </motion.button>
               </div>
-              
-              <div className="space-y-3">
-                {upcomingSessions.length > 0 ? (
-                  upcomingSessions.map((session, index) => (
-                    <motion.div 
-                      key={session.id} 
-                      className="flex items-center justify-between p-4 rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className={`w-3 h-3 rounded-full ${
-                          session.isActive ? 'bg-emerald-500' : 'bg-gray-400'
-                        }`} />
-                        <div>
-                          <p className="font-medium text-gray-900">{session.hospitalName}</p>
-                          <p className="text-sm text-gray-600">
-                            {session.dayOfWeek} • {session.startTime} - {session.endTime}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {session.hospitalCity}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">
-                          {session.maxTokens} tokens
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {session.avgMinutesPerPatient}min/patient
-                        </p>
-                      </div>
-                    </motion.div>
-                  ))
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                      <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 7V3a1 1 0 011-1h6a1 1 0 011 1v4h3a2 2 0 012 2v1a1 1 0 01-1 1H4a1 1 0 01-1-1V9a2 2 0 012-2h3z"/>
-                      </svg>
-                    </div>
-                    <p className="text-gray-600">No active sessions</p>
-                    <p className="text-sm text-gray-500 mt-1">Create consultation sessions with hospitals to see them here</p>
-                  </div>
-                )}
+            </div>
+
+            {/* Tips Card */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-lg p-6 border border-blue-200">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <AlertCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-gray-900 mb-2">Quick Tip</h4>
+                  <p className="text-sm text-gray-700">
+                    Use the <span className="font-semibold">Consultation Page</span> to efficiently manage your patient queue, update your status, and complete consultations with medical records.
+                  </p>
+                </div>
               </div>
-            </motion.div>
-          </div>
-        </motion.div>
+            </div>
+          </motion.div>
+        </div>
       </main>
     </div>
   );

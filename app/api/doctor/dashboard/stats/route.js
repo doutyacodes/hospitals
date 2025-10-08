@@ -91,8 +91,8 @@ export async function GET(request) {
 
     // Fetch total unique patients (from completed appointments)
     const totalPatientsResult = await db
-      .select({ 
-        count: sql`COUNT(DISTINCT appointments.patient_id)`
+      .select({
+        count: sql`COUNT(DISTINCT ${appointments.userId})`
       })
       .from(appointments)
       .where(

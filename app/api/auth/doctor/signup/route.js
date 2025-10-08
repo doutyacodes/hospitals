@@ -85,66 +85,60 @@ export async function POST(request) {
     const doctorId = nanoid();
     const adminId = nanoid();
 
-    // Start transaction to create both doctor and admin records
-    const result = await db.transaction(async (tx) => {
-      try {
-        // Create doctor record first
-        console.log('Creating doctor with ID:', doctorId);
-        const doctorInsertResult = await tx.insert(doctors).values({
-          id: doctorId,
-          name,
-          email,
-          phone,
-          specialtyId,
-          qualification,
-          experience: parseInt(experience),
-          bio,
-          licenseNumber,
-          dateOfBirth,
-          address,
-          city,
-          state,
-          zipCode,
-          consultationFee: parseFloat(consultationFee),
-          isAvailable: true,
-          rating: '0.00',
-          totalReviews: 0,
-        });
-
-        console.log('Doctor insert result:', doctorInsertResult);
-
-        // Verify doctor was created successfully
-        const createdDoctor = await tx
-          .select()
-          .from(doctors)
-          .where(eq(doctors.id, doctorId))
-          .limit(1);
-
-        console.log('Created doctor verification:', createdDoctor);
-
-        if (createdDoctor.length === 0) {
-          throw new Error('Failed to create doctor record - not found after insert');
-        }
-
-        // Create doctor admin record
-        console.log('Creating doctor admin with doctorId:', doctorId);
-        const adminInsertResult = await tx.insert(doctorAdmins).values({
-          id: adminId,
-          doctorId: doctorId,
-          email,
-          passwordHash,
-          role: 'doctor',
-          isActive: true,
-        });
-
-        console.log('Doctor admin insert result:', adminInsertResult);
-
-        return { success: true, doctorId, adminId };
-      } catch (txError) {
-        console.error('Transaction error:', txError);
-        throw txError;
-      }
+    // Create doctor record first
+    console.log('Creating doctor with ID:', doctorId);
+    await db.insert(doctors).values({
+      id: doctorId,
+      name,
+      email,
+      phone,
+      specialtyId,
+      qualification,
+      experience: parseInt(experience),
+      bio,
+      licenseNumber,
+      dateOfBirth: dateOfBirth || null,
+      address: address || null,
+      city: city || null,
+      state: state || null,
+      zipCode: zipCode || null,
+      consultationFee: parseFloat(consultationFee),
+      isAvailable: true,
+      status: 'offline',
+      rating: '0.00',
+      totalReviews: 0,
     });
+
+    console.log('Doctor created successfully');
+
+    // Verify doctor exists before creating admin (important for FK constraint)
+    const verifyDoctor = await db
+      .select({ id: doctors.id })
+      .from(doctors)
+      .where(eq(doctors.id, doctorId))
+      .limit(1);
+
+    console.log('Doctor verification:', verifyDoctor);
+
+    if (verifyDoctor.length === 0) {
+      throw new Error('Doctor record not found after insert');
+    }
+
+    // Small delay to ensure DB commit (for InnoDB)
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Create doctor admin record
+    console.log('Creating doctor admin with doctorId:', doctorId);
+    await db.insert(doctorAdmins).values({
+      id: adminId,
+      doctorId: doctorId,
+      email,
+      passwordHash,
+      role: 'doctor',
+      isActive: true,
+    });
+
+    console.log('Doctor admin created successfully');
 
     // Generate JWT token
     const token = generateToken({

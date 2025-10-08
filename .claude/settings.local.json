@@ -6,7 +6,9 @@
       "Bash(mv:*)",
       "Bash(rm:*)",
       "Bash(npm run build:*)",
-      "Bash(mysql:*)"
+      "Bash(mysql:*)",
+      "Bash(where mysql)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

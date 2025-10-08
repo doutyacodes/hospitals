@@ -21,8 +21,12 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'all';
 
-    let whereClause = eq(doctorHospitalRequests.doctorId, payload.doctorId);
-    
+    // Only show requests initiated by hospitals (not by this doctor)
+    let whereClause = and(
+      eq(doctorHospitalRequests.doctorId, payload.doctorId),
+      eq(doctorHospitalRequests.requestedBy, 'hospital')
+    );
+
     if (status !== 'all') {
       whereClause = and(
         whereClause,
@@ -37,6 +41,7 @@ export async function GET(request) {
         status: doctorHospitalRequests.status,
         message: doctorHospitalRequests.message,
         responseMessage: doctorHospitalRequests.responseMessage,
+        requestedBy: doctorHospitalRequests.requestedBy,
         requestedAt: doctorHospitalRequests.requestedAt,
         respondedAt: doctorHospitalRequests.respondedAt,
         hospitalName: hospitals.name,
