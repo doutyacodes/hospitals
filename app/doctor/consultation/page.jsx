@@ -105,15 +105,16 @@ export default function DoctorConsultationPage() {
         const completed = data.appointments.filter(apt => apt.status === 'completed');
         setCompletedCount(completed.length);
 
-        // Find missed tokens (confirmed but skipped)
-        const confirmedTokens = data.appointments
-          .filter(apt => apt.status === 'confirmed')
+        // Find missed tokens (appointments that were marked as missed/no-show)
+        const missedAppointments = data.appointments
+          .filter(apt =>
+            apt.missedAppointment === true &&
+            apt.status === 'confirmed' &&
+            apt.tokenNumber < (currentToken || 0)
+          )
           .map(apt => apt.tokenNumber);
 
-        if (currentToken) {
-          const missed = confirmedTokens.filter(t => t < currentToken);
-          setMissedTokens(missed);
-        }
+        setMissedTokens(missedAppointments);
       }
     } catch (err) {
       console.error('Error fetching appointments:', err);
@@ -216,7 +217,11 @@ export default function DoctorConsultationPage() {
       setUpdating(true);
 
       const appointment = todayAppointments.find(apt => apt.tokenNumber === tokenNumber);
-      if (!appointment) return;
+      if (!appointment) {
+        error('Appointment not found');
+        setUpdating(false);
+        return;
+      }
 
       const response = await fetch('/api/doctor/consultation/no-show', {
         method: 'POST',
@@ -229,19 +234,30 @@ export default function DoctorConsultationPage() {
       if (data.success) {
         success(`Token #${tokenNumber} marked as no-show`);
 
-        // Add to missed tokens if not already there
+        // Immediately update the missed tokens list
         if (!missedTokens.includes(tokenNumber)) {
-          setMissedTokens(prev => [...prev, tokenNumber]);
+          setMissedTokens(prev => [...prev, tokenNumber].sort((a, b) => a - b));
         }
 
-        // Auto-call next token
-        setTimeout(() => {
-          callNextToken();
-        }, 500);
+        // Update the appointments list to reflect the no-show status
+        setTodayAppointments(prev =>
+          prev.map(apt =>
+            apt.id === appointment.id
+              ? { ...apt, missedAppointment: true, tokenStatus: 'missed' }
+              : apt
+          )
+        );
+
+        // Wait a moment for UI to update, then refresh and call next token
+        setTimeout(async () => {
+          await fetchTodayAppointments(true);
+          await callNextToken();
+        }, 800);
       } else {
         error(data.message || 'Failed to mark as no-show');
       }
     } catch (err) {
+      console.error('Mark no-show error:', err);
       error('Failed to mark as no-show');
     } finally {
       setUpdating(false);
@@ -506,50 +522,67 @@ export default function DoctorConsultationPage() {
                 <p className="text-center py-12 text-gray-500">No appointments</p>
               ) : (
                 <div className="space-y-4">
-                  {todayAppointments.map((appointment) => (
-                    <div
-                      key={appointment.id}
-                      className={`border-2 rounded-lg p-4 ${
-                        appointment.tokenNumber === currentToken
-                          ? 'border-emerald-500 bg-emerald-50'
-                          : appointment.status === 'completed'
-                          ? 'border-green-200 bg-green-50'
-                          : appointment.status === 'no_show'
-                          ? 'border-red-200 bg-red-50'
-                          : 'border-gray-200'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold ${
-                            appointment.status === 'completed' ? 'bg-green-100 text-green-600' :
-                            appointment.status === 'no_show' ? 'bg-red-100 text-red-600' :
-                            appointment.tokenNumber === currentToken ? 'bg-emerald-600 text-white' :
-                            'bg-gray-200 text-gray-600'
-                          }`}>
-                            #{appointment.tokenNumber}
+                  {todayAppointments.map((appointment) => {
+                    const isMissed = appointment.missedAppointment === true || appointment.tokenStatus === 'missed';
+                    const isCompleted = appointment.status === 'completed';
+                    const isCurrent = appointment.tokenNumber === currentToken;
+
+                    return (
+                      <div
+                        key={appointment.id}
+                        className={`border-2 rounded-lg p-4 transition-all ${
+                          isCurrent
+                            ? 'border-emerald-500 bg-emerald-50'
+                            : isCompleted
+                            ? 'border-green-200 bg-green-50'
+                            : isMissed
+                            ? 'border-orange-300 bg-orange-50'
+                            : 'border-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold ${
+                              isCompleted ? 'bg-green-100 text-green-600' :
+                              isMissed ? 'bg-orange-200 text-orange-700' :
+                              isCurrent ? 'bg-emerald-600 text-white' :
+                              'bg-gray-200 text-gray-600'
+                            }`}>
+                              #{appointment.tokenNumber}
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-lg">{appointment.patientName}</h3>
+                              <p className="text-sm text-gray-600">{appointment.estimatedTime}</p>
+                              {appointment.patientComplaints && (
+                                <p className="text-sm text-gray-700 mt-1">{appointment.patientComplaints}</p>
+                              )}
+                              {isMissed && (
+                                <p className="text-xs text-orange-600 mt-1 font-semibold flex items-center gap-1">
+                                  <UserX className="w-3 h-3" />
+                                  Marked as no-show
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <div>
-                            <h3 className="font-semibold text-lg">{appointment.patientName}</h3>
-                            <p className="text-sm text-gray-600">{appointment.estimatedTime}</p>
-                            {appointment.patientComplaints && (
-                              <p className="text-sm text-gray-700 mt-1">{appointment.patientComplaints}</p>
+                          <div className="flex flex-col items-end gap-2">
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                              isCompleted ? 'bg-green-100 text-green-800' :
+                              isMissed ? 'bg-orange-100 text-orange-800' :
+                              appointment.status === 'confirmed' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {isMissed ? 'NO SHOW' : appointment.status.toUpperCase()}
+                            </span>
+                            {appointment.isRecalled && (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
+                                Recalled
+                              </span>
                             )}
                           </div>
                         </div>
-                        <div>
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            appointment.status === 'completed' ? 'bg-green-100 text-green-800' :
-                            appointment.status === 'no_show' ? 'bg-red-100 text-red-800' :
-                            appointment.status === 'confirmed' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {appointment.status.toUpperCase()}
-                          </span>
-                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

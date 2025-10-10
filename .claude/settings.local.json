@@ -8,7 +8,9 @@
       "Bash(npm run build:*)",
       "Bash(mysql:*)",
       "Bash(where mysql)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(tree:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []
